@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
 
 export const db = drizzle({
 	connection: {
@@ -6,3 +7,7 @@ export const db = drizzle({
 		// ssl: true
 	}
 })
+
+export async function applyMigrations() {
+	await migrate(db, { migrationsFolder: './.drizzle' })
+}

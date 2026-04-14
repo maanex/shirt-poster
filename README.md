@@ -12,6 +12,8 @@ To run:
 bun run index.ts
 ```
 
+Database migrations in `.drizzle` are applied automatically on startup.
+
 ### Initial setup
 
 Run `/kv key:GET value:ADMIN global:true` to get admin rights assigned to your user. Only one user can do this.

@@ -13,5 +13,6 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json cordo.config.ts ./
 COPY src ./src
+COPY .drizzle ./.drizzle
 
 CMD ["bun", "run", "./src/index.ts"]

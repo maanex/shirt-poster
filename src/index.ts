@@ -1,7 +1,13 @@
 import { Cordo } from "cordo/core"
 import { Client, Events, GatewayIntentBits } from "discord.js"
+import { applyMigrations } from "./db/postgres"
 import { KV } from "./lib/kv"
 import { moduleList } from "./lib/module-list"
+
+
+
+// Apply pending SQL migrations on startup.
+await applyMigrations()
 
 // Load env vars from files if *_FILE vars are present
 for (const [ key, value ] of Object.entries(process.env)) {
