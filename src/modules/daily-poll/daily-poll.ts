@@ -169,6 +169,6 @@ export default defineModule({
           makeAndPostDailyPoll(guild.id, client.user.id)
         }, Math.floor(Math.random() * 1000 * 60 * 60 * 4))
       }
-    }, 1000 * 60 * 60 * 24)
+    }, 1000 * 60 * 60 * 3)
   },
 })
