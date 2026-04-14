@@ -11,6 +11,7 @@ import { moduleList } from "./lib/module-list"
 
 // Load env vars from files if *_FILE vars are present
 for (const [ key, value ] of Object.entries(process.env)) {
+  console.log('DEBUG:', key, '=', value)
   if (!key.endsWith('_FILE'))
     continue
 
@@ -23,6 +24,7 @@ for (const [ key, value ] of Object.entries(process.env)) {
   try {
     const fileContent = await Bun.file(value).text()
     process.env[actualKey] = fileContent.trim()
+    console.log('SETTING:', actualKey, '=', fileContent.trim())
   } catch (err) {
     console.error(`Error reading file for ${key}:`, err)
   }
