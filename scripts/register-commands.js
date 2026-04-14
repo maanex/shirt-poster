@@ -4,7 +4,7 @@ import { ApplicationCommandOptionType, ApplicationIntegrationType, InteractionCo
 const axios = require('axios')
 
 const token = process.env.DISCORD_API_KEY
-const clientid = process.env.CLIENT_ID
+const clientid = process.env.DISCORD_CLIENT_ID
 
 const commands = [
   {

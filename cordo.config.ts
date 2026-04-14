@@ -5,7 +5,7 @@ export default defineCordoConfig({
   typeDest: './src/types/cordo.ts',
   rootDir: './src',
   client: {
-    id: process.env.CLIENT_ID,
+    id: process.env.DISCORD_CLIENT_ID,
   },
   functDefaultFlags: {
     run: {

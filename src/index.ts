@@ -3,13 +3,33 @@ import { Client, Events, GatewayIntentBits } from "discord.js"
 import { KV } from "./lib/kv"
 import { moduleList } from "./lib/module-list"
 
+// Load env vars from files if *_FILE vars are present
+for (const [ key, value ] of Object.entries(process.env)) {
+  if (!key.endsWith('_FILE'))
+    continue
+
+  const actualKey = key.slice(0, -'_FILE'.length)
+  if (actualKey in process.env) {
+    console.warn(`Both ${key} and ${actualKey} are set. Ignoring ${key}.`)
+    continue
+  }
+
+  try {
+    const fileContent = await Bun.file(value).text()
+    process.env[actualKey] = fileContent.trim()
+  } catch (err) {
+    console.error(`Error reading file for ${key}:`, err)
+  }
+}
+
+
 // Load KV config
 await KV.load()
 
 // Mount cordo
 await Cordo.mountCordo({
   client: {
-    id: process.env.CLIENT_ID as string,
+    id: process.env.DISCORD_CLIENT_ID as string,
   },
 })
 
