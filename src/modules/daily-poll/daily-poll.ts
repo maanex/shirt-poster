@@ -3,18 +3,8 @@ import { defineModule } from '../../lib/module'
 import { getMessageMemoryFor, type MessageMemory } from '../chat-history'
 import { KV } from '../../lib/kv'
 import { DailyPollHelpers } from './helpers'
+import { lcgRandom, pickOne } from '../../lib/utils'
 
-
-function lcgRandom(step: number, range = 10): number {
-	const prime = 7
-	const offset = 3
-
-	return ((step * prime) + offset) % range
-}
-
-function pickOne<T>(...options: T[]): T {
-	return options[Math.floor(Math.random() * options.length)]!
-}
 
 const prompters = [
 	(messages: MessageMemory[]) => {

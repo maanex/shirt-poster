@@ -1,7 +1,7 @@
 import { defineModule } from "../lib/module"
 
 const mapping = {
-  'sus 🤨': /(?:^|\w)sus(?:\w|$)/i
+  'sus 🤨': /(?:(?:^|\s)sus\S)|(?:\Ssus(?:\S|$))/i
 }
 
 export default defineModule({
