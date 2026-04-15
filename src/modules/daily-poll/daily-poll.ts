@@ -155,10 +155,20 @@ export default defineModule({
   onReady({ client }) {
     setInterval(() => {
       for (const guild of client.guilds.cache.values()) {
+				const channelId = KV.get('daily-poll.channel', { guild: BigInt(guild.id) })
+				if (!channelId)
+					continue
+
+				const currentDay = Math.floor((Date.now() + Number(BigInt(guild.id) >> 22n)) / (1000 * 60 * 60 * 24)).toString()
+				const lastSend = KV.get('daily-poll.last', { guild: BigInt(guild.id), default: currentDay })
+				if (lastSend === currentDay)
+					continue
+
         setTimeout(() => {
+					KV.set('daily-poll.last', currentDay, { guild: BigInt(guild.id) })
           makeAndPostDailyPoll(guild.id, client.user.id)
-        }, Math.floor(Math.random() * 1000 * 60 * 60 * 4))
+        }, Math.floor(Math.random() * 1000 * 60 * 59))
       }
-    }, 1000 * 60 * 60 * 24)
+    }, 1000 * 60 * 60 * 1)
   },
 })
