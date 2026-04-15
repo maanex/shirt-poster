@@ -87,4 +87,17 @@ export namespace KV {
       })
   }
 
+  export function* listCached(prefix: string, options?: Options) {
+    const guildPrefix = options?.guild ? `${options.guild}:` : ''
+    const fullPrefix = guildPrefix + prefix
+    for (const [ cacheKey, value ] of cache.entries()) {
+      if (cacheKey.startsWith(fullPrefix)) {
+        yield {
+          key: cacheKey.slice(guildPrefix.length),
+          value: String(value)
+        }
+      }
+    }
+  }
+
 }

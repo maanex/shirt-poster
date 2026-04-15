@@ -62,11 +62,29 @@ export default defineCordoRoute(i => {
   }
 
   if (value === undefined) {
-    const currentValueGuild = guild ? KV.get(key.toLowerCase(), { guild }) : null
-    const currentValueGlobal = KV.get(key.toLowerCase())
+    if (key.endsWith('*')) {
+      const prefix = key.slice(0, -1).toLowerCase()
+      const found = Array.from(KV.listCached(prefix, { guild }))
+      return i.render(
+        text(found.map(entry => `${entry.key}=${entry.value}`).join('\n').slice(0, 1999) || 'No keys found with that prefix.')
+          .codeBlock(),
+        enforcePrivateResponse()
+      )
+    }
+    else {
+      const currentValueGuild = guild ? KV.get(key.toLowerCase(), { guild }) : null
+      const currentValueGlobal = KV.get(key.toLowerCase())
+      return i.render(
+        text(`(guild)${key}=${currentValueGuild}\n(global)${key}=${currentValueGlobal}`)
+          .codeBlock(),
+        enforcePrivateResponse()
+      )
+    }
+  }
+
+  if (key.includes('*')) {
     return i.render(
-      text(`(guild)${key}=${currentValueGuild}\n(global)${key}=${currentValueGlobal}`)
-        .codeBlock(),
+      text('Wildcard keys are not supported.'),
       enforcePrivateResponse()
     )
   }
