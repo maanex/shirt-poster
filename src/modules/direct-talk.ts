@@ -8,8 +8,6 @@ export default defineModule({
     messageCreate: async (msg) => {
       if (msg.author.bot)
         return
-      if (!msg.content.includes(`<@${msg.client.user?.id}>`))
-        return
 
       if (msg.content.startsWith(`<@${msg.client.user?.id}>`)) {
         // direct talk
@@ -76,7 +74,7 @@ export default defineModule({
 
         msg.reply(`thank you for your message! I'll get back to you within 5-10 business days.`)
       }
-      else {
+      else if (msg.content.includes(`<@${msg.client.user?.id}>`)) {
         msg.reply(pickOne(
           '⚠️ Shirt Poster Bot mentioned!',
           '?',
@@ -88,6 +86,9 @@ export default defineModule({
           'uhm',
           'out of office'
         ))
+      }
+      else if (msg.content.includes('shirt poster')) {
+        msg.reply('https://cdn.discordapp.com/attachments/975750923911581696/1494314798383628288/address-me.png')
       }
     }
   }

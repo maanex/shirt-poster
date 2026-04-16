@@ -1,12 +1,12 @@
-# shirt poster 👕
+# absolute shirt poster ✋😐🤚
 
-To install dependencies:
+To install 👕:
 
 ```bash
 bun install
 ```
 
-To run:
+To 👕:
 
 ```bash
 bun run index.ts
@@ -14,12 +14,12 @@ bun run index.ts
 
 Database migrations in `.drizzle` are applied automatically on startup.
 
-### Initial setup
+### Initial 👕 setup
 
 Run `/kv key:GET value:ADMIN global:true` to get admin rights assigned to your user. Only one user can do this.
 
 
-### KV options
+### KV 👕 options
 
 key | type | purpose
 ----|------|--------
@@ -29,7 +29,7 @@ daily-poll.channel | string | id for the daily poll channel
 user.{id}.{permission} | bool | if the user has the permission
 
 
-### Permissions
+### 👕 Permissions
 name | purpose
 -----|--------
 admin | this user can change permissions
