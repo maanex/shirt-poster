@@ -99,7 +99,18 @@ export default defineModule({
             msg.reply(msg.author.avatarURL() ?? 'I can\'t hear you')
           }
           else if (lowercaseContent === 'please') {
-            msg.reply(`${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`)
+            msg.reply([
+              `IP Address: ${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
+              `User Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${Math.floor(Math.random() * 100)}.0.${Math.floor(Math.random() * 1000)}.${Math.floor(Math.random() * 100)} Safari/537.36`,
+              `Browser Version: 146.0.0.0`,
+              `Latitude: ${(Math.random() * 180 - 90).toFixed(4)}`,
+              `Longitude: ${(Math.random() * 360 - 180).toFixed(4)}`,
+              `User Name: ${msg.author.username}`,
+              `Created At: ${msg.author.createdAt.toISOString()}`,
+              `Display Pixel Depth: 24`,
+              `Available Sandbox Memory: 4096MB`,
+              `Current Time UTC: ${new Date().toISOString()}`,
+            ].join('\n'))
           }
         }
       }
