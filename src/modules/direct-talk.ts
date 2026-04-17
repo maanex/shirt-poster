@@ -9,6 +9,8 @@ export default defineModule({
       if (msg.author.bot)
         return
 
+      const lowercaseContent = msg.content.toLowerCase()
+
       if (msg.content.startsWith(`<@${msg.client.user?.id}>`)) {
         // direct talk
         const content = msg.content.slice(`<@${msg.client.user?.id}>`.length).trim().toLowerCase()
@@ -87,8 +89,19 @@ export default defineModule({
           'out of office'
         ))
       }
-      else if (msg.content.includes('shirt poster')) {
+      else if (lowercaseContent.includes('shirt poster')) {
         msg.reply('https://cdn.discordapp.com/attachments/975750923911581696/1494314798383628288/address-me.png')
+      }
+      else if (msg.reference) {
+        const ref = await msg.fetchReference()
+        if (ref.author.id === msg.client.user?.id) {
+          if (lowercaseContent === 'why') {
+            msg.reply(msg.author.avatarURL() ?? 'I can\'t hear you')
+          }
+          else if (lowercaseContent === 'please') {
+            msg.reply(`${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`)
+          }
+        }
       }
     }
   }
