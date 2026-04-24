@@ -3,6 +3,7 @@ import axios from 'axios'
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import consola from 'consola'
+import { pickOne } from '../../lib/utils'
 
 
 export namespace DailyPollHelpers {
@@ -26,7 +27,7 @@ export namespace DailyPollHelpers {
 
 Constraints:
 - Tone: ${system.tone}. No "AI enthusiasm."
-- Style: Lowercase preferred. No hashtags, no emojis (unless ironic/weird).
+- Style: ${pickOne('Lowercase preferred.', 'Lowercase preferred.', 'Title case preferred.', '')} No hashtags, no emojis (unless ironic/weird).
 - Content: Avoid "would you rather" cliches. Focus on ${system.content}.
 - Length: Question < 20 words. Options < 5 words.
 

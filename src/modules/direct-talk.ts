@@ -112,6 +112,15 @@ export default defineModule({
               `Current Time UTC: ${new Date().toISOString()}`,
             ].join('\n'))
           }
+          else if (lowercaseContent === 'thank you' || lowercaseContent === 'thanks') {
+            msg.reply(`you're welcome!`)
+          }
+          else if (lowercaseContent.includes('emoji')) {
+            msg.reply(pickOne('😀', '😂', '😍', '🤔', '🙃', '😎', '😭', '😡', '🥳', '👻'))
+          }
+          else if (lowercaseContent.includes('help')) {
+            msg.reply('j')
+          }
         }
       }
     }
