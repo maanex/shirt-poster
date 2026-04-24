@@ -39,10 +39,11 @@ const prompters = [
 	},
 	(messages: MessageMemory[]) => {
 		const users = new Set(messages.map(msg => msg.authorName))
+		const now = Date.now()
 		if (users.size === 1 || (users.size > 1 && Math.random() < 0.1))
 			return `user "${Array.from(users)[0]}" vs something else`
 		else if (users.size >= 2)
-			return `user "${Array.from(users)[lcgRandom(Date.now(), users.size)]}" vs "${Array.from(users)[lcgRandom(Date.now(), users.size)]}"`
+			return `user "${Array.from(users)[lcgRandom(now, users.size)]}" vs "${Array.from(users)[lcgRandom(now + 1, users.size)]}"`
 		else
 			return 'the server is very quiet, make a play on that'
 	},
@@ -63,18 +64,19 @@ const prompters = [
 			return 'current weather events'
 	},
 	async () => {
-		const cities = [ 'New York', 'London', 'Tokyo', 'Paris', 'Sydney' ]
-		const city = cities[lcgRandom(Date.now(), cities.length)]!
-		const res = await axios
-			.get(`https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current_weather=true&timezone=UTC&city=${encodeURIComponent(city)}`, { timeout: 5000 })
-			.then(res => JSON.stringify(res.data))
-			.catch(() => 'bruhhhhhhhhhhhhhhhhhhhh')
-		return `current weather in ${city}: ${res}`
-	},
-	() => {
-		return axios.get('https://xkcd.com/info.0.json', { timeout: 5000 })
-			.then(res => res.data?.alt ?? Math.random().toString(20))
-			.catch(() => 'sad day today :(')
+		if (Math.random() < 0.5) {
+			const cities = [ 'New York', 'London', 'Tokyo', 'Paris', 'Sydney', 'Berlin' ]
+			const city = cities[lcgRandom(Date.now(), cities.length)]!
+			const res = await axios
+				.get(`https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current_weather=true&timezone=UTC&city=${encodeURIComponent(city)}`, { timeout: 5000 })
+				.then(res => JSON.stringify(res.data))
+				.catch(() => 'bruhhhhhhhhhhhhhhhhhhhh')
+			return `current weather in ${city}: ${res}`
+		} else {
+			return axios.get('https://xkcd.com/info.0.json', { timeout: 5000 })
+				.then(res => res.data?.alt ?? Math.random().toString(20))
+				.catch(() => 'sad day today :(')
+		}
 	},
 	() => `make a poll about ${pickOne('movies', 'video games', 'food', 'music', 'sports', 'technology', 'books', 'travel', 'fashion', 'memes', 'celebrities', 'animals', 'nature', 'space', 'history', 'art', 'science', 'health', 'education', 'politics', 'business', 'finance', 'relationships', 'philosophy', 'psychology', 'self-improvement', 'productivity', 'hobbies', 'fun facts', 'jokes', 'random trivia')}`,
 	() => pickOne(
@@ -126,7 +128,8 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'conspiracy theorist who sees hidden meanings in everything',
 			'snarky, witty, pop culture-obsessed critic',
 			'weirdly specific niche enthusiast (e.g. vintage tech, obscure media, esoteric hobbies)',
-			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts'
+			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',
+			'ghost (actual ghost)',
 		),
 		tone: pickOne(
 			'surreal, dry, low-effort, slightly unhinged',
@@ -137,7 +140,8 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'absurdist and nonsensical',
 			'pretentious and verbose like an overeducated intellectual',
 			'uwu girl :3 OwO .✦ ݁˖ hehe *purrs* ꉂ(˵˃ ᗜ ˂˵) meow ^^ kawaii (˶>⩊<˶)',
-			'ignore the \'no emojis\' rule and only speak in emojis! ✨🤓🌲😳'
+			'ignore the \'no emojis\' rule and only speak in emojis! ✨🤓🌲😳',
+			'theoretical, hypothetical, and highly intellectual'
 		),
 		content: pickOne(
 			'weirdly specific scenarios, niche internet observations, or bizarre hypotheticals',
@@ -148,6 +152,7 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'hilariously mundane things that people overreact to',
 			'deep philosophical questions with no right answer',
 			'conspiracy theories that are just plausible enough to be entertaining',
+			'something never asked or thought about before, a truly original question or scenario',
 		),
 	})
 }
