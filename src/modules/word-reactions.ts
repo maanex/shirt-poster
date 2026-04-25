@@ -11,6 +11,9 @@ export default defineModule({
       if (msg.author.bot)
         return
 
+      if (Math.random() > 0.01)
+        return
+
       for (const [ word, regex ] of Object.entries(mapping)) {
         if (regex.test(msg.content)) {
           msg.reply(word)
