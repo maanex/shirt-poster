@@ -153,7 +153,7 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'conspiracy theorist who sees hidden meanings in everything',
 			'snarky, witty, pop culture-obsessed critic',
 			'weirdly specific niche enthusiast (e.g. vintage tech, obscure media, esoteric hobbies)',
-			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',,
+			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',
 			'ironic, iconic, self-aware',
 			'ghost (actual ghost)',
 		),
