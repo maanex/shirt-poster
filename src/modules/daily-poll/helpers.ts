@@ -28,13 +28,14 @@ export namespace DailyPollHelpers {
 Constraints:
 - Tone: ${system.tone}. No "AI enthusiasm."
 - Style: ${pickOne('Lowercase preferred.', 'Lowercase preferred.', 'Title case preferred.', '')} No hashtags, no emojis (unless ironic/weird).
-- Content: Avoid "would you rather" cliches. Focus on ${system.content}.
-- Length: Question < 20 words. Options < 5 words.
+- Content: Avoid boring cliches. Focus on ${system.content}.
+- Length: Question < 30 words. Options < 10 words.
 
 Format:
 Question
 - Option 1
-- Option 2`
+- Option 2
+...`
 			const result = await generateText({
 				model: google('gemma-4-31b-it'),
 				system: systemPrompt,

@@ -7,15 +7,15 @@ import { lcgRandom, pickOne } from '../../lib/utils'
 import type { Client } from 'discord.js'
 
 
-const prompters = [
+const promptersWithContext = [
 	(messages: MessageMemory[]) => {
 		const mes = messages.filter(msg => msg.content.length > 20).at(-1)
-		return mes ? `user "${mes.authorName}" said "${mes.content}"` : 'no recent messages, make up a prompt'
+		return mes ? `user "${mes.authorName}" said "${mes.content}"` : null
 	},
 	(messages: MessageMemory[]) => {
 		const mesList = messages.filter(msg => msg.content.length >= 10 && msg.content.length <= 30)
 		if (mesList.length < 3)
-			return mesList[0]?.content ?? 'this place is dead :skull:'
+			return mesList[0]?.content ?? null
 		const now = Date.now()
 		const mes1 = mesList[lcgRandom(now, mesList.length)]
 		const mes2 = mesList[lcgRandom(now + 1, mesList.length)]
@@ -27,15 +27,21 @@ const prompters = [
 		const now = Date.now()
 		const mes1 = mesList[lcgRandom(now, mesList.length)]
 		const mes2 = mesList[lcgRandom(now + 1, mesList.length)]
+		if (!mes1 && !mes2)
+			return null
 		return `${mes1?.content}, ${mes2?.content}`
 	},
 	(messages: MessageMemory[]) => {
+		if (!messages.length)
+			return null
 		return messages.map(m => `${m.authorName}: ${m.content}`).join('\n').slice(-1000)
 	},
 	(messages: MessageMemory[]) => {
 		const users = new Set(messages.map(msg => msg.authorName))
 		const user = Array.from(users)[lcgRandom(Date.now(), users.size)]
-		return `make a poll about user "${user ?? 'FreeStuff Bot'}"`
+		if (!user)
+			return null
+		return `make a poll about user "${user}"`
 	},
 	(messages: MessageMemory[]) => {
 		const users = new Set(messages.map(msg => msg.authorName))
@@ -45,7 +51,7 @@ const prompters = [
 		else if (users.size >= 2)
 			return `user "${Array.from(users)[lcgRandom(now, users.size)]}" vs "${Array.from(users)[lcgRandom(now + 1, users.size)]}"`
 		else
-			return 'the server is very quiet, make a play on that'
+			return null
 	},
 	(messages: MessageMemory[]) => {
 		const words = new Map<string, number>()
@@ -61,8 +67,11 @@ const prompters = [
 		if (topWords.length > 0)
 			return `make a poll about "${topWords[lcgRandom(Date.now(), topWords.length)]}"`
 		else
-			return 'current weather events'
+			return null
 	},
+]
+
+const promptersGeneric = [
 	async () => {
 		if (Math.random() < 0.5) {
 			const cities = [ 'New York', 'London', 'Tokyo', 'Paris', 'Sydney', 'Berlin' ]
@@ -90,9 +99,13 @@ const prompters = [
 		'fun fact',
 		'conspiracy theory',
 		'this or that',
+		'would you prefer',
+		'which would you choose',
+		'best pick of the following',
 		'would you rather',
 		'hypothetical scenario',
 		'what if',
+		'imagine this scenario',
 		'guess the answer',
 		'make a poll about the last thing you ate',
 	)
@@ -114,8 +127,19 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 		return true
 	})
 
+	// 70% chance to use context-aware prompters, 30% chance to use generic prompters
+	// if context-aware prompters are used but there are no messages, fallback to generic prompters
+	const withContext = lcgRandom(stepper, 10) < 7
+	const prompters = withContext ? promptersWithContext : promptersGeneric
 	const prompter = prompters[lcgRandom(stepper, prompters.length)]!
-	const prompt = await Promise.resolve(prompter(messages))
+	let prompt = await Promise.resolve(prompter(messages))
+	if (!prompt && withContext) {
+		const fallbackPrompter = promptersGeneric[lcgRandom(stepper + 1, promptersGeneric.length)]!
+		prompt = await Promise.resolve(fallbackPrompter())
+	}
+	if (!prompt) {
+		prompt = 'make a poll about something'
+	}
 
 	return DailyPollHelpers.generateAndPostPoll(prompt, channelId, {
 		personality: pickOne(
@@ -123,23 +147,28 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'sarcastic, edgy, slightly unhinged internet user',
 			'absurdist, surrealist, dadaist troll',
 			'uwu-obsessed, anime-loving, ironic memer',
+			'anime lover',
 			'pretentious, verbose, overeducated intellectual',
 			'deadpan, dry, brutally honest realist',
 			'conspiracy theorist who sees hidden meanings in everything',
 			'snarky, witty, pop culture-obsessed critic',
 			'weirdly specific niche enthusiast (e.g. vintage tech, obscure media, esoteric hobbies)',
-			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',
+			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',,
+			'ironic, iconic, self-aware',
 			'ghost (actual ghost)',
 		),
 		tone: pickOne(
-			'surreal, dry, low-effort, slightly unhinged',
+			'dry, low-effort, slightly unhinged',
 			'casual, conversational, with a hint of sarcasm',
 			'over-the-top dramatic and theatrical',
 			'deadpan and brutally honest',
 			'conspiratorial and mysterious',
 			'absurdist and nonsensical',
 			'pretentious and verbose like an overeducated intellectual',
+			'normal, everyday tone like a regular person',
+			'toddler who just learned to talk',
 			'uwu girl :3 OwO .✦ ݁˖ hehe *purrs* ꉂ(˵˃ ᗜ ˂˵) meow ^^ kawaii (˶>⩊<˶)',
+			'lots of typos (you write super fast and carelessly) and internet slang like "bruh", "lol", "omg", "wtf", "no cap", "yeet", "sus", "based", "cringe", etc.',
 			'ignore the \'no emojis\' rule and only speak in emojis! ✨🤓🌲😳',
 			'theoretical, hypothetical, and highly intellectual'
 		),
@@ -153,6 +182,10 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'deep philosophical questions with no right answer',
 			'conspiracy theories that are just plausible enough to be entertaining',
 			'something never asked or thought about before, a truly original question or scenario',
+			'finding connections between seemingly unrelated things',
+			'building community',
+			'letting people get to know each other and bond over shared experiences and opinions',
+			'creating a fun and engaging way for people to interact and share their thoughts',
 		),
 	})
 }
