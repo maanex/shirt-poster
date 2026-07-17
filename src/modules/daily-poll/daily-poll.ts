@@ -144,14 +144,8 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 	return DailyPollHelpers.generateAndPostPoll(prompt, channelId, {
 		personality: pickOne(
 			'cynical, terminally online shitposter',
-			'sarcastic, edgy, slightly unhinged internet user',
-			'absurdist, surrealist, dadaist troll',
 			'uwu-obsessed, anime-loving, ironic memer',
-			'anime lover',
 			'pretentious, verbose, overeducated intellectual',
-			'deadpan, dry, brutally honest realist',
-			'conspiracy theorist who sees hidden meanings in everything',
-			'snarky, witty, pop culture-obsessed critic',
 			'weirdly specific niche enthusiast (e.g. vintage tech, obscure media, esoteric hobbies)',
 			'stupid person. like really stupid. insanely dumb. no braincells, no coherent thoughts',
 			'ironic, iconic, self-aware',
@@ -159,12 +153,10 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 		),
 		tone: pickOne(
 			'dry, low-effort, slightly unhinged',
-			'casual, conversational, with a hint of sarcasm',
+			'casual, conversational',
 			'over-the-top dramatic and theatrical',
 			'deadpan and brutally honest',
-			'conspiratorial and mysterious',
-			'absurdist and nonsensical',
-			'pretentious and verbose like an overeducated intellectual',
+			'mysterious',
 			'normal, everyday tone like a regular person',
 			'toddler who just learned to talk',
 			'uwu girl :3 OwO .✦ ݁˖ hehe *purrs* ꉂ(˵˃ ᗜ ˂˵) meow ^^ kawaii (˶>⩊<˶)',
@@ -173,11 +165,8 @@ export async function makeAndPostDailyPoll(guildId: string, clientId: string) {
 			'theoretical, hypothetical, and highly intellectual'
 		),
 		content: pickOne(
-			'weirdly specific scenarios, niche internet observations, or bizarre hypotheticals',
 			'current events and pop culture happenings',
 			'universally relatable everyday experiences',
-			'absurd and surreal situations that defy logic',
-			'controversial and divisive topics that spark debate',
 			'hilariously mundane things that people overreact to',
 			'deep philosophical questions with no right answer',
 			'conspiracy theories that are just plausible enough to be entertaining',
