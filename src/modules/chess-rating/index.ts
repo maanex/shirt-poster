@@ -1,5 +1,5 @@
 import { defineModule } from "../../lib/module"
-import { systemOneClient } from "../../lib/system-one"
+import { debugLog, getDecisionClient } from "../../lib/system-one"
 import { formatConversation, selectMessages } from "./conversation-builder"
 import { messageCache } from "./message-cache"
 import {
@@ -14,11 +14,11 @@ export * from "./conversation-builder"
 export * from "./message-cache"
 
 /**
- * Checks if the top probability is at least 0.15 higher than the second highest probability.
+ * Checks if the top probability is at least 0.1 higher than the second highest probability.
  */
 export function meetsConfidenceGap(
   probabilities: Record<string, number>,
-  minGap = 0.15
+  minGap = 0.1
 ): { ok: boolean; highest: number; secondHighest: number; diff: number } {
   const sorted = Object.values(probabilities).sort((a, b) => b - a)
   const highest = sorted[0] ?? 0
@@ -35,11 +35,11 @@ export default defineModule({
         return
       }
       if (msg.channel.isDMBased()) {
-        console.log(`[ChessRating] Skipped DM message from ${msg.author.tag}`)
+        debugLog(`[ChessRating] Skipped DM message from ${msg.author.tag}`)
         return
       }
 
-      console.log(`[ChessRating] Handling message from ${msg.author.tag}: "${msg.content}"`)
+      debugLog(`[ChessRating] Handling message from ${msg.author.tag}: "${msg.content}"`)
 
       // Add to cache
       const cached = messageCache.add(msg)
@@ -51,7 +51,7 @@ export default defineModule({
 
       // If message content is empty (e.g. only embeds/attachments), ignore
       if (!msg.content.trim()) {
-        console.log(`[ChessRating] Skipped: message content is empty`)
+        debugLog(`[ChessRating] Skipped: message content is empty`)
         return
       }
 
@@ -61,14 +61,15 @@ export default defineModule({
       const conversationText = formatConversation(selected)
 
       if (!conversationText.trim()) {
-        console.log(`[ChessRating] Skipped: formatted conversation is empty`)
+        debugLog(`[ChessRating] Skipped: formatted conversation is empty`)
         return
       }
 
-      console.log(`[ChessRating] Sending state to SystemOne (${selected.length} msgs):\n${conversationText}`)
+      debugLog(`[ChessRating] Sending state to decision model (${selected.length} msgs):\n${conversationText}`)
 
-      // Query System One API
-      const answer = await systemOneClient.askChoice<ChessRating>(
+      // Query decision model (System One or Cloudflare Clef)
+      const decisionClient = getDecisionClient()
+      const answer = await decisionClient.askChoice<ChessRating>(
         conversationText,
         "chess_rating",
         CHESS_RATING_CRITERIA,
@@ -76,16 +77,16 @@ export default defineModule({
       )
 
       if (!answer) {
-        console.log(`[ChessRating] SystemOne returned no answer`)
+        debugLog(`[ChessRating] Decision model returned no answer`)
         return
       }
 
-      console.log(`[ChessRating] SystemOne answer: "${answer.choice}" (confidence: ${answer.confidence})`, answer.probabilities)
+      debugLog(`[ChessRating] Decision model answer: "${answer.choice}" (confidence: ${answer.confidence})`, answer.probabilities)
 
-      // Verify the confidence condition: top choice must lead by at least 0.15
-      const gap = meetsConfidenceGap(answer.probabilities, 0.15)
+      // Verify the confidence condition: top choice must lead by at least 0.1
+      const gap = meetsConfidenceGap(answer.probabilities, 0.1)
       if (!gap.ok) {
-        console.log(`[ChessRating] Skipped: confidence gap too narrow (highest: ${gap.highest.toFixed(3)}, 2nd: ${gap.secondHighest.toFixed(3)}, diff: ${gap.diff.toFixed(3)} < 0.15)`)
+        debugLog(`[ChessRating] Skipped: confidence gap too narrow (highest: ${gap.highest.toFixed(3)}, 2nd: ${gap.secondHighest.toFixed(3)}, diff: ${gap.diff.toFixed(3)} < 0.1)`)
         return
       }
 
@@ -95,10 +96,13 @@ export default defineModule({
         return
       }
 
+      // Extract the ID from the <:name:id> format, or use as-is
+      const emojiId = emoji.match(/:(\d+)>/)?.[1] ?? emoji
+
       try {
-        console.log(`[ChessRating] Reacting to message ${msg.id} with ${emoji}...`)
-        await msg.react(emoji)
-        console.log(`[ChessRating] Reacted successfully!`)
+        debugLog(`[ChessRating] Reacting to message ${msg.id} with ${emoji}...`)
+        await msg.react(emojiId)
+        debugLog(`[ChessRating] Reacted successfully!`)
       } catch (err) {
         console.error(`[ChessRating] Failed to react to message ${msg.id}:`, err)
       }

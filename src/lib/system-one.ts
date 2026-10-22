@@ -1,7 +1,6 @@
 export type SystemOneChoiceQuestion<T extends string = string> = {
   type: "choice"
   instructions?: string
-  question?: string
   criteria: Record<T, string>
 }
 
@@ -27,25 +26,37 @@ export type SystemOneResponseBody<T extends string = string> = {
   }
 }
 
-export type SystemOneConfig = {
-  url?: string
-  model?: string
-  timeoutMs?: number
+export interface DecisionModelClient {
+  askChoice<T extends string>(
+    state: string,
+    questionKey: string,
+    criteria: Record<T, string>,
+    instructions?: string
+  ): Promise<SystemOneChoiceAnswer<T> | null>
 }
 
-export class SystemOneClient {
-  private readonly url: string
-  private readonly model: string
-  private readonly timeoutMs: number
+export const isDebugEnabled = () => process.env.CHESS_RATING_DEBUG === "true"
 
-  constructor(config?: SystemOneConfig) {
-    this.url = config?.url ?? process.env.SYSTEM_ONE_URL ?? "http://localhost:11435/v1/systemone"
-    this.model = config?.model ?? process.env.SYSTEM_ONE_MODEL ?? "laya:en"
-    this.timeoutMs = config?.timeoutMs ?? 10_000
+export const debugLog = (...args: unknown[]) => {
+  if (isDebugEnabled()) {
+    console.log(...args)
+  }
+}
+
+export abstract class BaseDecisionClient implements DecisionModelClient {
+  protected readonly timeoutMs: number
+
+  constructor(timeoutMs = 10_000) {
+    this.timeoutMs = timeoutMs
   }
 
+  protected abstract getUrl(): string
+  protected abstract getHeaders(): Record<string, string>
+  protected abstract getModelName(): string
+  protected abstract validateConfig(): string | null
+
   /**
-   * Prompts System One to evaluate a state string against a set of choice criteria.
+   * Prompts the decision model to evaluate a state string against a set of choice criteria.
    */
   async askChoice<T extends string>(
     state: string,
@@ -53,51 +64,161 @@ export class SystemOneClient {
     criteria: Record<T, string>,
     instructions?: string
   ): Promise<SystemOneChoiceAnswer<T> | null> {
+    const configError = this.validateConfig()
+    if (configError) {
+      console.error(`[${this.constructor.name}] Configuration error: ${configError}`)
+      return null
+    }
+
     const questionObj: SystemOneChoiceQuestion<T> = {
       type: "choice",
       criteria,
-      ...(instructions ? { instructions, question: instructions } : {}),
+      ...(instructions ? { instructions } : {}),
     }
 
     const payload: SystemOneRequestBody<T> = {
-      model: this.model,
+      model: this.getModelName(),
       state,
       questions: {
         [questionKey]: questionObj,
       },
     }
 
+    const url = this.getUrl()
     try {
-      console.log(`[SystemOne] POST ${this.url} (model: ${this.model})`)
-      const response = await fetch(this.url, {
+      debugLog(`[${this.constructor.name}] POST ${url} (model: ${this.getModelName()})`)
+      const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(this.timeoutMs),
       })
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "")
-        console.error(`[SystemOne] Request failed (${response.status}): ${errorText}`)
+        console.error(`[${this.constructor.name}] Request failed (${response.status}): ${errorText}`)
         return null
       }
 
-      const data = (await response.json()) as SystemOneResponseBody<T>
+      const raw = await response.json()
+      // Cloudflare envelopes results in { result: ... }, while standard System One returns answers at the root
+      const data = (raw.result ?? raw) as SystemOneResponseBody<T>
       const answer = data.answers?.[questionKey]
       if (!answer) {
-        console.warn(`[SystemOne] No answer found for question key "${questionKey}" in response.`)
+        console.warn(`[${this.constructor.name}] No answer found for question key "${questionKey}" in response.`)
         return null
       }
 
       return answer
     } catch (err) {
-      console.error("[SystemOne] Error calling System One API:", err)
+      console.error(`[${this.constructor.name}] Error calling API:`, err)
       return null
     }
   }
 }
 
-export const systemOneClient = new SystemOneClient()
+export type SystemOneConfig = {
+  url?: string
+  model?: string
+  timeoutMs?: number
+}
 
+export class SystemOneClient extends BaseDecisionClient {
+  private readonly url: string
+  private readonly model: string
+
+  constructor(config?: SystemOneConfig) {
+    super(config?.timeoutMs)
+    this.url = config?.url ?? process.env.SYSTEM_ONE_URL ?? "http://localhost:11435/v1/systemone"
+    this.model = config?.model ?? process.env.SYSTEM_ONE_MODEL ?? "laya:en"
+  }
+
+  protected validateConfig(): string | null {
+    return null
+  }
+
+  protected getUrl(): string {
+    return this.url
+  }
+
+  protected getHeaders(): Record<string, string> {
+    return {
+      "Content-Type": "application/json",
+    }
+  }
+
+  protected getModelName(): string {
+    return this.model
+  }
+}
+
+export type CloudflareClefConfig = {
+  accountId?: string
+  apiToken?: string
+  url?: string
+  model?: string
+  timeoutMs?: number
+}
+
+export class CloudflareClefClient extends BaseDecisionClient {
+  private readonly accountId?: string
+  private readonly apiToken?: string
+  private readonly customUrl?: string
+  private readonly model: string
+
+  constructor(config?: CloudflareClefConfig) {
+    super(config?.timeoutMs)
+    this.accountId = config?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID
+    this.apiToken = config?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN
+    this.customUrl = config?.url ?? process.env.CLOUDFLARE_CLEF_URL
+    this.model = config?.model ?? "clef"
+  }
+
+  protected validateConfig(): string | null {
+    if (!this.customUrl && (!this.accountId || !this.apiToken)) {
+      return "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN must be set to use Cloudflare Clef"
+    }
+    return null
+  }
+
+  protected getUrl(): string {
+    if (this.customUrl) {
+      return this.customUrl
+    }
+    return `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/ai/run/@cf/cloudflare/clef`
+  }
+
+  protected getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    if (this.apiToken) {
+      headers["Authorization"] = `Bearer ${this.apiToken}`
+    }
+    return headers
+  }
+
+  protected getModelName(): string {
+    return this.model
+  }
+}
+
+export const systemOneClient = new SystemOneClient()
+export const cloudflareClefClient = new CloudflareClefClient()
+
+/**
+ * Returns the configured decision model client based on DECISION_PROVIDER or available credentials.
+ */
+export function getDecisionClient(): DecisionModelClient {
+  const provider = process.env.DECISION_PROVIDER?.toLowerCase()
+  if (provider === "cloudflare" || provider === "clef") {
+    return cloudflareClefClient
+  }
+  if (provider === "systemone") {
+    return systemOneClient
+  }
+  if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+    return cloudflareClefClient
+  }
+  return systemOneClient
+}
