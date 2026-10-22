@@ -1,4 +1,4 @@
-export type ChessRating = "blunder" | "inaccuracy" | "good" | "excellent" | "book"
+export type ChessRating = "blunder" | "inaccuracy" | "good" | "excellent" | "book" | "brilliant"
 
 export const CHESS_RATING_EMOJIS: Record<ChessRating, string> = {
   // blunder: "❓",
@@ -7,6 +7,7 @@ export const CHESS_RATING_EMOJIS: Record<ChessRating, string> = {
   // excellent: "✨",
   // book: "📖",
   blunder: "<:blunder:1371421711932850186>",
+  brilliant: "<:brilliant:1562949599969288253>",
   inaccuracy: "<:inaccuracy:1371421718878617703>",
   good: "<:good:1371421716890386452>",
   excellent: "<:excellent:1371421715464323082>",
@@ -23,11 +24,12 @@ export const CHESS_RATING_INSTRUCTIONS = "Just rate the last message in this con
 //   book: "Standard conversational opening or conventional reply, common greeting, well-known meme, or routine etiquette",
 // }
 export const CHESS_RATING_CRITERIA: Record<ChessRating, string> = {
-  book: "Standard conversational opening or formulaic greeting (e.g. 'hi', 'how's it going', routine chat starters)",
-  excellent: "A top-tier move: sharp insight, clever comeback, highly witty remark, or winning argument",
-  good: "A solid, reasonable response that keeps the conversation flowing smoothly without standing out",
-  inaccuracy: "A slight conversational misstep: mild misunderstanding, awkward phrasing, or slightly questionable take",
-  blunder: "A devastating mistake: massive self-own, completely embarrassing take, total cringe, or destroying one's own point",
+  book: "A textbook or predictable move: routine greeting, standard etiquette, familiar meme, or expected cliché",
+  brilliant: "An extraordinary 200 IQ play: an unexpected zinger, genius revelation, or remarkably clever twist",
+  excellent: "A strong, high-effort move: insightful point, genuinely funny remark, great explanation, or sharp comeback",
+  good: "A basic, ordinary move: simple acknowledgment, standard confirmation, or straightforward functional reply",
+  inaccuracy: "A sub-optimal move: slight tangent, passive or unhelpful reply, mild misunderstanding, or awkward phrasing",
+  blunder: "A terrible misplay: severe cringe, obvious self-contradiction, embarrassing take, or conversational derailment",
 }
 
 export type CachedMessage = {
