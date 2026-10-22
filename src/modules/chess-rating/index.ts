@@ -122,10 +122,16 @@ export default defineModule({
 
       debugLog(`[ChessRating] Decision model answer: "${answer.choice}" (confidence: ${answer.confidence})`, answer.probabilities)
 
-      // Verify the confidence condition: top choice must lead by at least 0.1
-      const gap = meetsConfidenceGap(answer.probabilities, 0.1)
+      // Check minimum confidence gap from KV (guild-specific or global, default: 0.1)
+      const minGap = KV.getFloat("chess-rating.min-confidence", {
+        guild: BigInt(msg.guildId),
+        default: 0.1,
+      })
+
+      // Verify the confidence condition: top choice must lead by at least minGap
+      const gap = meetsConfidenceGap(answer.probabilities, minGap)
       if (!gap.ok) {
-        debugLog(`[ChessRating] Skipped: confidence gap too narrow (highest: ${gap.highest.toFixed(3)}, 2nd: ${gap.secondHighest.toFixed(3)}, diff: ${gap.diff.toFixed(3)} < 0.1)`)
+        debugLog(`[ChessRating] Skipped: confidence gap too narrow (highest: ${gap.highest.toFixed(3)}, 2nd: ${gap.secondHighest.toFixed(3)}, diff: ${gap.diff.toFixed(3)} < ${minGap})`)
         return
       }
 

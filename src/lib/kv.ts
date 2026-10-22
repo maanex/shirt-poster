@@ -55,6 +55,15 @@ export namespace KV {
     return isNaN(parsed) ? options?.default ?? 0 : parsed
   }
 
+  export function getFloat(key: string, options?: Options & { default?: number }) {
+    const value = get(key, { ...options, default: undefined })
+    if (value === null)
+      return options?.default ?? 0
+
+    const parsed = parseFloat(value)
+    return isNaN(parsed) ? options?.default ?? 0 : parsed
+  }
+
   export async function set(key: string, value: string | boolean | number | null, options?: Options) {
     const guild = options?.guild ?? null
     const cacheKey = guild ? `${guild}:${key}` : key
