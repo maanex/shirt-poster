@@ -1,4 +1,5 @@
 import chatHistory from "../modules/chat-history"
+import chessRating from "../modules/chess-rating"
 import dailyPoll from "../modules/daily-poll/daily-poll"
 import directTalk from "../modules/direct-talk"
 import wordReactions from "../modules/word-reactions"
@@ -10,4 +11,5 @@ export const moduleList = [
   chatHistory,
   dailyPoll,
   directTalk,
+  chessRating,
 ] satisfies Module[]
