@@ -124,13 +124,13 @@ export type SystemOneConfig = {
 }
 
 export class SystemOneClient extends BaseDecisionClient {
-  private readonly url: string
-  private readonly model: string
+  private readonly configUrl?: string
+  private readonly configModel?: string
 
   constructor(config?: SystemOneConfig) {
     super(config?.timeoutMs)
-    this.url = config?.url ?? process.env.SYSTEM_ONE_URL ?? "http://localhost:11435/v1/systemone"
-    this.model = config?.model ?? process.env.SYSTEM_ONE_MODEL ?? "laya:en"
+    this.configUrl = config?.url
+    this.configModel = config?.model
   }
 
   protected validateConfig(): string | null {
@@ -138,7 +138,7 @@ export class SystemOneClient extends BaseDecisionClient {
   }
 
   protected getUrl(): string {
-    return this.url
+    return this.configUrl ?? process.env.SYSTEM_ONE_URL ?? "http://localhost:11435/v1/systemone"
   }
 
   protected getHeaders(): Record<string, string> {
@@ -148,7 +148,7 @@ export class SystemOneClient extends BaseDecisionClient {
   }
 
   protected getModelName(): string {
-    return this.model
+    return this.configModel ?? process.env.SYSTEM_ONE_MODEL ?? "laya:en"
   }
 }
 
@@ -161,17 +161,29 @@ export type CloudflareClefConfig = {
 }
 
 export class CloudflareClefClient extends BaseDecisionClient {
-  private readonly accountId?: string
-  private readonly apiToken?: string
-  private readonly customUrl?: string
-  private readonly model: string
+  private readonly configAccountId?: string
+  private readonly configApiToken?: string
+  private readonly configUrl?: string
+  private readonly configModel?: string
 
   constructor(config?: CloudflareClefConfig) {
     super(config?.timeoutMs)
-    this.accountId = config?.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID
-    this.apiToken = config?.apiToken ?? process.env.CLOUDFLARE_API_TOKEN
-    this.customUrl = config?.url ?? process.env.CLOUDFLARE_CLEF_URL
-    this.model = config?.model ?? "clef"
+    this.configAccountId = config?.accountId
+    this.configApiToken = config?.apiToken
+    this.configUrl = config?.url
+    this.configModel = config?.model
+  }
+
+  private get accountId(): string | undefined {
+    return this.configAccountId ?? process.env.CLOUDFLARE_ACCOUNT_ID
+  }
+
+  private get apiToken(): string | undefined {
+    return this.configApiToken ?? process.env.CLOUDFLARE_API_TOKEN
+  }
+
+  private get customUrl(): string | undefined {
+    return this.configUrl ?? process.env.CLOUDFLARE_CLEF_URL
   }
 
   protected validateConfig(): string | null {
@@ -192,14 +204,15 @@ export class CloudflareClefClient extends BaseDecisionClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    if (this.apiToken) {
-      headers["Authorization"] = `Bearer ${this.apiToken}`
+    const token = this.apiToken
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
     }
     return headers
   }
 
   protected getModelName(): string {
-    return this.model
+    return this.configModel ?? "clef"
   }
 }
 
