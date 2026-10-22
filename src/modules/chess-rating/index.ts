@@ -1,3 +1,4 @@
+import { KV } from "../../lib/kv"
 import { defineModule } from "../../lib/module"
 import { debugLog, getDecisionClient } from "../../lib/system-one"
 import { formatConversation, selectMessages } from "./conversation-builder"
@@ -12,6 +13,39 @@ import {
 export * from "./types"
 export * from "./conversation-builder"
 export * from "./message-cache"
+
+/**
+ * Checks if chess rating is enabled for this channel via KV (`chess-rating.channels`).
+ * Supports:
+ * - `*` for guild-wide access
+ * - Comma- or space-separated list of channel IDs (e.g. `123456789,987654321`)
+ */
+export function isChannelOptedIn(guildId: string | null | undefined, channelId: string): boolean {
+  if (!guildId) {
+    return false
+  }
+
+  const allowed = KV.get("chess-rating.channels", {
+    guild: BigInt(guildId),
+  })
+
+  if (!allowed) {
+    debugLog(`[ChessRating] Skipped: chess-rating.channels is unset for guild ${guildId}`)
+    return false
+  }
+
+  const trimmed = allowed.trim()
+  if (trimmed === "*") {
+    return true
+  }
+
+  const channelList = trimmed.split(/[\s,]+/).filter(Boolean)
+  const isAllowed = channelList.includes(channelId)
+  if (!isAllowed) {
+    debugLog(`[ChessRating] Skipped: channel ${channelId} not in chess-rating.channels (${allowed})`)
+  }
+  return isAllowed
+}
 
 /**
  * Checks if the top probability is at least 0.1 higher than the second highest probability.
@@ -36,6 +70,11 @@ export default defineModule({
       }
       if (msg.channel.isDMBased()) {
         debugLog(`[ChessRating] Skipped DM message from ${msg.author.tag}`)
+        return
+      }
+
+      // Check opt-in via KV (chess-rating.channels)
+      if (!isChannelOptedIn(msg.guildId, msg.channelId)) {
         return
       }
 
