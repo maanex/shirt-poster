@@ -6,6 +6,43 @@ import { configKv } from "../db/schema"
 
 export namespace KV {
 
+  export const knownOptions = {
+    'user.{id}.{permission}': {
+      type: 'boolean',
+      default: false
+    },
+    'chat-history.length': {
+      type: 'int',
+      default: 100
+    },
+    'daily-poll.channel': {
+      type: 'string',
+      default: null
+    },
+    'chess-rating.channels': {
+      type: 'string',
+      default: null
+    },
+    'chess-rating.min-confidence': {
+      type: 'float',
+      default: 24
+    },
+    'chess-rating.history-limit': {
+      type: 'int',
+      default: 10
+    },
+    'chess-rating.history-cutoff-hours': {
+      type: 'float',
+      default: 24
+    },
+  } as const
+
+  type LooseAutocomplete<T extends string> = T | Omit<string, T>
+  type KnownOptionKey = LooseAutocomplete<keyof typeof knownOptions>
+  type KnownOptionKeyForType<T extends 'boolean' | 'int' | 'float' | 'string'> = LooseAutocomplete<{
+    [K in keyof typeof knownOptions]: typeof knownOptions[K]['type'] extends T ? K : never
+  }[keyof typeof knownOptions]>
+
   type Options = {
     guild?: bigint
   }
@@ -29,16 +66,16 @@ export namespace KV {
     }
   }
 
-  export function get(key: string, options?: Options & { default?: string }) {    
+  export function get(key: KnownOptionKey, options?: Options & { default?: string }) {    
     if (!options?.guild)
-      return cache.get(key) ?? options?.default ?? null
+      return cache.get(key as string) ?? options?.default ?? null
 
     return cache.get(`${options.guild}:${key}`)
-      ?? cache.get(key)
+      ?? cache.get(key as string)
       ?? null
   }
 
-  export function getBool(key: string, options?: Options & { default?: boolean }) {
+  export function getBool(key: KnownOptionKeyForType<'boolean'>, options?: Options & { default?: boolean }) {
     const value = get(key, { ...options, default: undefined })
     if (value === null)
       return options?.default ?? false
@@ -46,7 +83,7 @@ export namespace KV {
     return value === 'true'
   }
 
-  export function getInt(key: string, options?: Options & { default?: number }) {
+  export function getInt(key: KnownOptionKeyForType<'int'>, options?: Options & { default?: number }) {
     const value = get(key, { ...options, default: undefined })
     if (value === null)
       return options?.default ?? 0
@@ -55,7 +92,7 @@ export namespace KV {
     return isNaN(parsed) ? options?.default ?? 0 : parsed
   }
 
-  export function getFloat(key: string, options?: Options & { default?: number }) {
+  export function getFloat(key: KnownOptionKeyForType<'float'>, options?: Options & { default?: number }) {
     const value = get(key, { ...options, default: undefined })
     if (value === null)
       return options?.default ?? 0
@@ -64,16 +101,16 @@ export namespace KV {
     return isNaN(parsed) ? options?.default ?? 0 : parsed
   }
 
-  export async function set(key: string, value: string | boolean | number | null, options?: Options) {
+  export async function set(key: KnownOptionKey, value: string | boolean | number | null, options?: Options) {
     const guild = options?.guild ?? null
-    const cacheKey = guild ? `${guild}:${key}` : key
-    const prevValue = cache.get(cacheKey) ?? null
+    const cacheKey = guild ? `${guild}:${key}` : key as string
+    const prevValue = cache.get(cacheKey as string) ?? null
     const stringValue = String(value)
-    cache.set(cacheKey, stringValue)
+    cache.set(cacheKey as string, stringValue)
 
     const where = guild === null
-      ? and(eq(configKv.key, key), isNull(configKv.guild))
-      : and(eq(configKv.key, key), eq(configKv.guild, guild))
+      ? and(eq(configKv.key, key as string), isNull(configKv.guild))
+      : and(eq(configKv.key, key as string), eq(configKv.guild, guild))
 
     await db
       .update(configKv)
@@ -85,7 +122,7 @@ export namespace KV {
           return
 
         await db.insert(configKv).values({
-          key,
+          key: key as string,
           guild,
           value: stringValue
         })

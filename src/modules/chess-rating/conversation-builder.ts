@@ -1,116 +1,113 @@
-import type { CachedMessage } from "./types"
-
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000
+import type { TextBasedChannel } from 'discord.js'
+import { getMessage, getOlderChannelMessages, type MessageMemory } from '../chat-history'
+import type { ChessRating } from './types'
 
 /**
- * Generates letter labels: 0 -> "A", 1 -> "B", ..., 25 -> "Z", 26 -> "A1", etc.
+ * Generates letter labels: 0 -> 'A', 1 -> 'B', ..., 25 -> 'Z', 26 -> 'A1', etc.
  */
 export function getAuthorLabel(index: number): string {
-  if (index < 26) {
-    return String.fromCharCode(65 + index)
-  }
   const letter = String.fromCharCode(65 + (index % 26))
-  const suffix = Math.floor(index / 26)
-  return `${letter}${suffix}`
+  return index < 26 ? letter : `${letter}${Math.floor(index / 26)}`
 }
 
-/**
- * Escapes regex special characters in a string.
- */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
- * Selects up to `maxMessages` following the rules:
- * 1. If current message is a reply, include the entire reply chain (up to maxMessages).
- * 2. Backfill remaining slots from recent channel history.
- * 3. Cut off older channel messages if the gap between consecutive messages is > 3 hours
- *    (reply-chain ancestors bypass this cutoff).
+ * Collects older messages backwards from an anchor timestamp until limit is reached or gap exceeds maxGapMs.
  */
-export function selectMessages(
-  channelMessages: CachedMessage[],
-  currentMessage: CachedMessage,
-  maxMessages = 10,
-  maxGapMs = THREE_HOURS_MS
-): CachedMessage[] {
-  const messageMap = new Map<string, CachedMessage>()
-  for (const msg of channelMessages) {
-    messageMap.set(msg.id, msg)
-  }
-  messageMap.set(currentMessage.id, currentMessage)
+function collectWithCutoff(
+  candidates: MessageMemory[],
+  anchorTimestamp: number,
+  limit: number,
+  maxGapMs: number
+): MessageMemory[] {
+  const result: MessageMemory[] = []
+  let prevTimestamp = anchorTimestamp
 
-  // 1. Traverse reply chain first
-  const replyChain: CachedMessage[] = [currentMessage]
-  const visitedReplyIds = new Set<string>([currentMessage.id])
-  let pointer = currentMessage
-
-  while (pointer.referenceMessageId && replyChain.length < maxMessages) {
-    const parentMsg = messageMap.get(pointer.referenceMessageId)
-    if (!parentMsg || visitedReplyIds.has(parentMsg.id)) {
+  for (let i = candidates.length - 1; i >= 0; i--) {
+    const candidate = candidates[i]!
+    if (prevTimestamp - candidate.timestamp > maxGapMs)
       break
-    }
-    visitedReplyIds.add(parentMsg.id)
-    replyChain.push(parentMsg)
-    pointer = parentMsg
+
+    result.unshift(candidate)
+    prevTimestamp = candidate.timestamp
+
+    if (result.length >= limit)
+      break
   }
 
-  const selectedMap = new Map<string, CachedMessage>()
-  for (const msg of replyChain) {
-    selectedMap.set(msg.id, msg)
-  }
-
-  // 2. Backfill from channel history in reverse order
-  if (selectedMap.size < maxMessages) {
-    const historyBeforeCurrent = channelMessages
-      .filter((m) => m.id !== currentMessage.id && m.createdAt <= currentMessage.createdAt)
-      .sort((a, b) => a.createdAt - b.createdAt)
-
-    let lastTimestamp = currentMessage.createdAt
-
-    for (let i = historyBeforeCurrent.length - 1; i >= 0; i--) {
-      const candidate = historyBeforeCurrent[i]!
-
-      if (selectedMap.has(candidate.id)) {
-        lastTimestamp = candidate.createdAt
-        continue
-      }
-
-      // Check the 3-hour cutoff between consecutive channel messages
-      if (lastTimestamp - candidate.createdAt > maxGapMs) {
-        break
-      }
-
-      selectedMap.set(candidate.id, candidate)
-      lastTimestamp = candidate.createdAt
-
-      if (selectedMap.size >= maxMessages) {
-        break
-      }
-    }
-  }
-
-  // Sort selected messages chronologically
-  return Array.from(selectedMap.values()).sort((a, b) => a.createdAt - b.createdAt)
+  return result
 }
 
 /**
- * Transforms an array of messages into a clean plaintext conversation:
- * - Authors mapped to "A", "B", "C", ... in order of appearance.
- * - Mentions (<@id> and @name) transformed into @A, @B, etc.
- * - Bare usernames / display names also translated into @A, @B, etc.
+ * Collects up to `maxMessages` conversation messages:
+ * - If target message is a reply: crawls the reply chain upwards until N messages or top of chain.
+ *   If top of chain is reached, queries older messages starting from the top of the chain.
+ * - If target message is not a reply: queries the last N messages in the channel.
+ * - Non-reply channel history respects the `cutoffHours` cutoff date.
  */
-export function formatConversation(messages: CachedMessage[]): string {
-  if (messages.length === 0) {
-    return ""
+export async function collectConversationMessages(
+  channel: TextBasedChannel,
+  targetMessage: MessageMemory,
+  maxMessages = 10,
+  cutoffHours = 3
+): Promise<MessageMemory[]> {
+  const maxGapMs = cutoffHours * 3600 * 1000
+
+  // 1. Target message is a Discord reply
+  if (targetMessage.referenceId) {
+    const chain: MessageMemory[] = [targetMessage]
+    let current = targetMessage
+
+    while (current.referenceId && chain.length < maxMessages) {
+      const parent = await getMessage(channel, current.referenceId)
+      if (!parent || chain.some((m) => m.id === parent.id))
+        break
+
+      chain.unshift(parent)
+      current = parent
+    }
+
+    if (chain.length < maxMessages) {
+      const root = chain[0]!
+      const needed = maxMessages - chain.length
+      const older = await getOlderChannelMessages(channel, needed, root.id)
+      const backfill = collectWithCutoff(older, root.timestamp, needed, maxGapMs)
+      return [...backfill, ...chain]
+    }
+
+    return chain.slice(-maxMessages)
   }
+
+  // 2. Target message is not a reply: collect recent channel history
+  const older = await getOlderChannelMessages(channel, maxMessages - 1, targetMessage.id)
+  const backfill = collectWithCutoff(older, targetMessage.timestamp, maxMessages - 1, maxGapMs)
+  return [...backfill, targetMessage]
+}
+
+/**
+ * Transforms an array of messages into a formatted conversation flow:
+ * - Authors mapped to 'A', 'B', 'C', ... in appearance order.
+ * - Mentions (<@id> and @name) transformed into @A, @B, etc.
+ * - Media/stickers replaced with *sent an image*, *sent a sticker*, etc.
+ * - Interaction commands attributed to user with descriptive action.
+ * - Each line prefixed with rating: `(book) A: ...`, `(unrated) B: ...`, `(RATE THIS) A: ...`
+ */
+export function formatConversation(
+  messages: MessageMemory[],
+  targetMessageId: string,
+  ratingCache: Map<string, ChessRating>
+): string {
+  if (messages.length === 0)
+    return ''
 
   const authorIdToLetter = new Map<string, string>()
   const authorNames: { name: string; letter: string }[] = []
-  const seenNameKeys = new Set<string>()
+  const seenNames = new Set<string>()
   let authorCount = 0
 
-  // Assign letters in chronological order of appearance and collect all known names
   for (const msg of messages) {
     let letter = authorIdToLetter.get(msg.authorId)
     if (!letter) {
@@ -118,49 +115,46 @@ export function formatConversation(messages: CachedMessage[]): string {
       authorIdToLetter.set(msg.authorId, letter)
     }
 
-    const candidateNames = [
-      msg.authorUsername,
-      msg.authorDisplayName,
-      msg.authorName,
-    ].filter((n): n is string => Boolean(n && n.trim().length > 0))
-
-    for (const rawName of candidateNames) {
-      const trimmed = rawName.trim()
-      const key = `${trimmed.toLowerCase()}:${letter}`
-      if (!seenNameKeys.has(key)) {
-        seenNameKeys.add(key)
+    for (const name of [msg.authorUsername, msg.authorDisplayName, msg.authorName]) {
+      const trimmed = name?.trim()
+      if (trimmed && !seenNames.has(trimmed.toLowerCase())) {
+        seenNames.add(trimmed.toLowerCase())
         authorNames.push({ name: trimmed, letter })
       }
     }
   }
 
-  // Sort known names by descending length so longer names match first
   authorNames.sort((a, b) => b.name.length - a.name.length)
 
   const formattedLines: string[] = []
 
   for (const msg of messages) {
-    const authorLetter = authorIdToLetter.get(msg.authorId) ?? "Unknown"
-    let content = msg.content
+    const authorLetter = authorIdToLetter.get(msg.authorId) ?? 'Unknown'
+    let content = ''
 
-    // 1. Replace Discord mention tags: <@123456789> or <@!123456789>
-    content = content.replace(/<@!?(\d+)>/g, (_, userId) => {
-      const letter = authorIdToLetter.get(userId)
-      return letter ? `@${letter}` : "@User"
-    })
+    if (msg.content.length > 0) {
+      let text = msg.content.replace(/<@!?(\d+)>/g, (_, userId) => {
+        const letter = authorIdToLetter.get(userId)
+        return letter ? `@${letter}` : '@User'
+      })
 
-    // 2. Replace plaintext usernames/display names (with or without "@")
-    for (const { name, letter } of authorNames) {
-      const regex =
-        name.length === 1
-          ? new RegExp(`@${escapeRegex(name)}(?=\\W|$)`, "gi")
-          : new RegExp(`(?:^|(?<=\\W))@?${escapeRegex(name)}(?=\\W|$)`, "gi")
-      content = content.replace(regex, `@${letter}`)
+      for (const { name, letter } of authorNames) {
+        const regex =
+          name.length === 1
+            ? new RegExp(`@${escapeRegex(name)}(?=\\W|$)`, 'gi')
+            : new RegExp(`(?:^|(?<=\\W))@?${escapeRegex(name)}(?=\\W|$)`, 'gi')
+        text = text.replace(regex, `@${letter}`)
+      }
+
+      content = msg.contentDescription ? `*${msg.contentDescription}*\n${text}` : text
+    } else {
+      content = `*${msg.contentDescription || 'empty message'}*`
     }
 
-    formattedLines.push(`${authorLetter}: ${content.trim()}`)
+    const rating = ratingCache.get(msg.id)
+    const prefix = msg.id === targetMessageId ? '(RATE THIS) ' : (rating ? `(${rating}) ` : '(unrated) ')
+    formattedLines.push(`${prefix}${authorLetter}: ${content.trim()}`)
   }
 
-  return formattedLines.join("\n")
+  return formattedLines.join('\n')
 }
-

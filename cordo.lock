@@ -4,6 +4,7 @@ cordo lockfile version 1
 [reg]
 idc 2
 lutc 0
+csync 71da56fd51ae78b4b13b9ee8b96d32a58d9039b5ca8648b16ca411b5d0163c5c
 
 [routes]
 000 command/test.ts

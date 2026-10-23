@@ -1,18 +1,28 @@
-import { KV } from "../../lib/kv"
-import { defineModule } from "../../lib/module"
-import { debugLog, getDecisionClient } from "../../lib/system-one"
-import { formatConversation, selectMessages } from "./conversation-builder"
-import { messageCache } from "./message-cache"
-import {
-  CHESS_RATING_CRITERIA,
-  CHESS_RATING_EMOJIS,
-  CHESS_RATING_INSTRUCTIONS,
-  type ChessRating,
-} from "./types"
+import { KV } from '../../lib/kv'
+import { defineModule } from '../../lib/module'
+import { debugLog, getDecisionClient } from '../../lib/system-one'
+import { parseDiscordMessage } from '../chat-history'
+import { collectConversationMessages, formatConversation } from './conversation-builder'
+import { CHESS_RATING_CRITERIA, CHESS_RATING_EMOJIS, CHESS_RATING_INSTRUCTIONS, type ChessRating } from './types'
 
-export * from "./types"
-export * from "./conversation-builder"
-export * from "./message-cache"
+export * from './types'
+export * from './conversation-builder'
+
+// In-memory cache of rated messages: messageId -> ChessRating
+export const ratingCache = new Map<string, ChessRating>()
+
+// Sequential message queue per channel to prevent race conditions in conversation flow
+const channelQueues = new Map<string, Promise<void>>()
+
+function queueChannelTask(channelId: string, task: () => Promise<void>): Promise<void> {
+  const next = (channelQueues.get(channelId) ?? Promise.resolve()).then(task, task)
+  channelQueues.set(channelId, next)
+  next.finally(() => {
+    if (channelQueues.get(channelId) === next)
+      channelQueues.delete(channelId)
+  })
+  return next
+}
 
 /**
  * Checks if chess rating is enabled for this channel via KV (`chess-rating.channels`).
@@ -21,137 +31,124 @@ export * from "./message-cache"
  * - Comma- or space-separated list of channel IDs (e.g. `123456789,987654321`)
  */
 export function isChannelOptedIn(guildId: string | null | undefined, channelId: string): boolean {
-  if (!guildId) {
+  if (!guildId)
     return false
-  }
 
-  const allowed = KV.get("chess-rating.channels", {
-    guild: BigInt(guildId),
-  })
-
-  if (!allowed) {
-    debugLog(`[ChessRating] Skipped: chess-rating.channels is unset for guild ${guildId}`)
+  const allowed = KV.get('chess-rating.channels', { guild: BigInt(guildId) })?.trim()
+  if (!allowed)
     return false
-  }
 
-  const trimmed = allowed.trim()
-  if (trimmed === "*") {
+  if (allowed === '*')
     return true
-  }
 
-  const channelList = trimmed.split(/[\s,]+/).filter(Boolean)
-  const isAllowed = channelList.includes(channelId)
-  if (!isAllowed) {
-    debugLog(`[ChessRating] Skipped: channel ${channelId} not in chess-rating.channels (${allowed})`)
-  }
-  return isAllowed
+  return allowed.split(/[\s,]+/).includes(channelId)
 }
 
 /**
- * Checks if the top probability is at least 0.1 higher than the second highest probability.
+ * Checks if the top probability is at least minGap higher than the second highest probability.
  */
 export function meetsConfidenceGap(
   probabilities: Record<string, number>,
   minGap = 0.1
 ): { ok: boolean; highest: number; secondHighest: number; diff: number } {
-  const sorted = Object.values(probabilities).sort((a, b) => b - a)
-  const highest = sorted[0] ?? 0
-  const secondHighest = sorted[1] ?? 0
+  const [highest = 0, secondHighest = 0] = Object.values(probabilities).sort((a, b) => b - a)
   const diff = highest - secondHighest
-  return { ok: diff >= minGap, highest, secondHighest, diff }
+  return {
+    ok: diff >= minGap,
+    highest,
+    secondHighest,
+    diff,
+  }
 }
 
 export default defineModule({
   listeners: {
     messageCreate: async (msg) => {
-      // 1. Filter out bot messages & DMs
-      if (msg.author.bot) {
+      // 1. Filter out direct messages
+      if (msg.channel.isDMBased())
         return
-      }
-      if (msg.channel.isDMBased()) {
-        debugLog(`[ChessRating] Skipped DM message from ${msg.author.tag}`)
+
+      // 2. Check opt-in via KV (chess-rating.channels)
+      if (!isChannelOptedIn(msg.guildId, msg.channelId))
         return
-      }
 
-      // Check opt-in via KV (chess-rating.channels)
-      if (!isChannelOptedIn(msg.guildId, msg.channelId)) {
+      // 3. Parse message into rich memory representation
+      const parsed = parseDiscordMessage(msg)
+
+      // 4. Do not rate/react to bot messages or messages without text content
+      if (parsed.isBot || parsed.content.length === 0)
         return
-      }
 
-      debugLog(`[ChessRating] Handling message from ${msg.author.tag}: "${msg.content}"`)
+      // 5. Process rating sequentially per channel
+      await queueChannelTask(msg.channelId, async () => {
+        const guildId = msg.guildId!
 
-      // Add to cache
-      const cached = messageCache.add(msg)
+        // Read N and T from KV with defaults
+        const maxMessages = KV.getInt('chess-rating.history-limit', {
+          guild: BigInt(guildId),
+          default: 10,
+        })
+        const cutoffHours = KV.getFloat('chess-rating.history-cutoff-hours', {
+          guild: BigInt(guildId),
+          default: 3,
+        })
 
-      // If this message references another, ensure the reply ancestors are fetched into the cache
-      if (msg.reference?.messageId) {
-        await messageCache.ensureReplyChain(msg.channel, cached)
-      }
+        // Collect conversation messages and format with ratings
+        const messages = await collectConversationMessages(
+          msg.channel,
+          parsed,
+          maxMessages,
+          cutoffHours
+        )
+        const conversationText = formatConversation(messages, parsed.id, ratingCache)
 
-      // If message content is empty (e.g. only embeds/attachments), ignore
-      if (!msg.content.trim()) {
-        debugLog(`[ChessRating] Skipped: message content is empty`)
-        return
-      }
+        if (!conversationText.trim())
+          return
 
-      // Build conversation plaintext following the 10-message & 3-hour cutoff rules
-      const channelMessages = messageCache.getChannelMessages(msg.channelId)
-      const selected = selectMessages(channelMessages, cached, 10)
-      const conversationText = formatConversation(selected)
+        debugLog(`[ChessRating] Conversation text:\n${conversationText}`)
 
-      if (!conversationText.trim()) {
-        debugLog(`[ChessRating] Skipped: formatted conversation is empty`)
-        return
-      }
+        // Query decision model
+        const decisionClient = getDecisionClient()
+        const answer = await decisionClient.askChoice<ChessRating>(
+          conversationText,
+          'chess_rating',
+          CHESS_RATING_CRITERIA,
+          CHESS_RATING_INSTRUCTIONS
+        )
 
-      debugLog(`[ChessRating] Sending state to decision model (${selected.length} msgs):\n${conversationText}`)
+        if (!answer)
+          return
 
-      // Query decision model (System One or Cloudflare Clef)
-      const decisionClient = getDecisionClient()
-      const answer = await decisionClient.askChoice<ChessRating>(
-        conversationText,
-        "chess_rating",
-        CHESS_RATING_CRITERIA,
-        CHESS_RATING_INSTRUCTIONS
-      )
+        debugLog(`[ChessRating] Model response: '${answer.choice}' (confidence: ${answer.confidence})`, answer.probabilities)
 
-      if (!answer) {
-        debugLog(`[ChessRating] Decision model returned no answer`)
-        return
-      }
+        // Check minimum confidence gap from KV (default 0.1)
+        const minGap = KV.getFloat('chess-rating.min-confidence', {
+          guild: BigInt(guildId),
+          default: 0.1,
+        })
 
-      debugLog(`[ChessRating] Decision model answer: "${answer.choice}" (confidence: ${answer.confidence})`, answer.probabilities)
+        const gap = meetsConfidenceGap(answer.probabilities, minGap)
+        if (!gap.ok)
+          return
 
-      // Check minimum confidence gap from KV (guild-specific or global, default: 0.1)
-      const minGap = KV.getFloat("chess-rating.min-confidence", {
-        guild: BigInt(msg.guildId),
-        default: 0.1,
+        // Cache the rating in RAM
+        ratingCache.set(parsed.id, answer.choice)
+
+        // React with fitting emoji
+        const emoji = CHESS_RATING_EMOJIS[answer.choice]
+        if (!emoji) {
+          console.warn(`[ChessRating] No emoji found for choice '${answer.choice}'`)
+          return
+        }
+
+        const emojiId = emoji.match(/:(\d+)>/)?.[1] ?? emoji
+
+        try {
+          await msg.react(emojiId)
+        } catch (err) {
+          console.error(`[ChessRating] Failed to react to message ${msg.id}:`, err)
+        }
       })
-
-      // Verify the confidence condition: top choice must lead by at least minGap
-      const gap = meetsConfidenceGap(answer.probabilities, minGap)
-      if (!gap.ok) {
-        debugLog(`[ChessRating] Skipped: confidence gap too narrow (highest: ${gap.highest.toFixed(3)}, 2nd: ${gap.secondHighest.toFixed(3)}, diff: ${gap.diff.toFixed(3)} < ${minGap})`)
-        return
-      }
-
-      const emoji = CHESS_RATING_EMOJIS[answer.choice]
-      if (!emoji) {
-        console.warn(`[ChessRating] No emoji found for choice "${answer.choice}"`)
-        return
-      }
-
-      // Extract the ID from the <:name:id> format, or use as-is
-      const emojiId = emoji.match(/:(\d+)>/)?.[1] ?? emoji
-
-      try {
-        debugLog(`[ChessRating] Reacting to message ${msg.id} with ${emoji}...`)
-        await msg.react(emojiId)
-        debugLog(`[ChessRating] Reacted successfully!`)
-      } catch (err) {
-        console.error(`[ChessRating] Failed to react to message ${msg.id}:`, err)
-      }
     },
   },
 })
-

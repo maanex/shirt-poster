@@ -36,8 +36,10 @@ await KV.load()
 await Cordo.mountCordo({
   client: {
     id: process.env.DISCORD_CLIENT_ID as string,
+    token: process.env.DISCORD_API_KEY as string,
   },
 })
+await Cordo.syncCommands()
 
 // Create Discord Client
 const client = new Client({
