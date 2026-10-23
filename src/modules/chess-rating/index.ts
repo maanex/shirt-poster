@@ -1,3 +1,5 @@
+import { db } from '../../db/postgres'
+import { chessRatings } from '../../db/schema'
 import { KV } from '../../lib/kv'
 import { defineModule } from '../../lib/module'
 import { debugLog, getDecisionClient } from '../../lib/system-one'
@@ -133,6 +135,17 @@ export default defineModule({
 
         // Cache the rating in RAM
         ratingCache.set(parsed.id, answer.choice)
+
+        // Persist rating to database
+        try {
+          await db.insert(chessRatings).values({
+            timestamp: new Date(parsed.timestamp),
+            userId: BigInt(parsed.authorId),
+            chessRating: answer.choice,
+          })
+        } catch (err) {
+          console.error(`[ChessRating] Failed to insert rating for user ${parsed.authorId}:`, err)
+        }
 
         // React with fitting emoji
         const emoji = CHESS_RATING_EMOJIS[answer.choice]

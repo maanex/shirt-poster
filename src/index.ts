@@ -20,13 +20,13 @@ for (const [ key, value ] of Object.entries(process.env)) {
 
 import { Cordo } from "cordo/core"
 import { Client, Events, GatewayIntentBits } from "discord.js"
+import { runMigrations } from './db/postgres'
 import { KV } from "./lib/kv"
 import { moduleList } from "./lib/module-list"
 
 
-
-// Apply pending SQL migrations on startup.
-// await applyMigrations()
+// Apply pending SQL migrations on startup
+await runMigrations()
 
 
 // Load KV config
