@@ -9,15 +9,15 @@ export const CHESS_RATING_EMOJIS: Record<ChessRating, string> = {
   book: '<:book:1371421713971282002>',
 }
 
-export const CHESS_RATING_INSTRUCTIONS = 'Given the conversation context, evaluate the conversational quality and impact of the message marked as (RATE THIS)'
+export const CHESS_RATING_INSTRUCTIONS = 'Rate the last message (marked as RATE THIS). Treat traits within each criterion as alternatives: matching any one is enough, not all.'
 
 export const CHESS_RATING_CRITERIA: Record<ChessRating, string> = {
-  book: 'A predictable message: routine greeting, familiar meme, or expected cliché, never surprising or original',
-  brilliant: 'An outstanding message: unexpected twist, genius comeback, random funny comment, or clever roast on another person',
-  excellent: 'A strong message: insightful point, showing personality, genuinely funny remark, great explanation, or sharp comeback',
-  good: 'A basic, ordinary message: simple acknowledgment, standard confirmation, or straightforward functional reply',
-  inaccuracy: 'A sub-optimal message: passive or unhelpful reply, mild misunderstanding, awkward phrasing, or slightly lost take',
-  blunder: 'A terrible misplay: cringe, self-own, obvious self-contradiction, embarrassing take, or conversational derailment',
+  book: 'highly predictable message, not surprising or original, the most obvious response or standard answer, lacks creativity or insight',
+  brilliant: 'outstanding message (positive or negative), highly unexpected but well-executed, smart comeback, funny comment, or clever roast on another person',
+  excellent: 'message showing strong personality, insightful point, funny remark, good explanation, or genuinely helpful',
+  good: 'basic ordinary message, simple acknowledgment, standard confirmation, or straightforward functional reply',
+  inaccuracy: 'sub-optimal message, passive or unhelpful reply, mild misunderstanding, awkward phrasing, or slightly lost take',
+  blunder: 'terrible misplay, cringe, lost, self-own, obvious self-contradiction, embarrassing take, or conversational derailment',
 }
 
 export type { MessageMemory, MessageMemory as CachedMessage } from '../chat-history'
