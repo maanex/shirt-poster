@@ -7,17 +7,26 @@ export const CHESS_RATING_EMOJIS: Record<ChessRating, string> = {
   good: '<:good:1371421716890386452>',
   excellent: '<:excellent:1371421715464323082>',
   book: '<:book:1371421713971282002>',
+  // blunder: '⁉️',
+  // brilliant: '🤯',
+  // inaccuracy: '🤔',
+  // good: '✅',
+  // excellent: '🌟',
+  // book: '📕',
 }
 
-export const CHESS_RATING_INSTRUCTIONS = 'Rate the last message (marked as RATE THIS). Treat traits within each criterion as alternatives: matching any one is enough, not all.'
+// export const CHESS_RATING_INSTRUCTIONS = 'Rate the last message (marked as RATE THIS) in a conversational context. Focus on the quality of the message, its relevance, and its impact on the conversation only. Format is `Author: Message`, one line per message.'
+export const CHESS_RATING_INSTRUCTIONS =
+  'You are an expert chess engine analyzing a casual text conversation like a game of chess ("Texting Theory"). ' +
+  'Evaluate ONLY the single target move labeled [TARGET MOVE] based on its wit, timing, banter, and conversational tactics within the context.'
 
 export const CHESS_RATING_CRITERIA: Record<ChessRating, string> = {
-  book: 'highly predictable message, not surprising or original, the most obvious response or standard answer, lacks creativity or insight',
-  brilliant: 'outstanding message (positive or negative), highly unexpected but well-executed, smart comeback, funny comment, or clever roast on another person',
-  excellent: 'message showing strong personality, insightful point, funny remark, good explanation, or genuinely helpful',
-  good: 'basic ordinary message, simple acknowledgment, standard confirmation, or straightforward functional reply',
-  inaccuracy: 'sub-optimal message, passive or unhelpful reply, mild misunderstanding, awkward phrasing, or slightly lost take',
-  blunder: 'terrible misplay, cringe, lost, self-own, obvious self-contradiction, embarrassing take, or conversational derailment',
+  book: 'Standard textbook opening greetings or conventional pleasantries at the start of a conversation (e.g. "hey", "sup", "how are you", "what\'s up"). Never applies to mid-conversation banter.',
+  good: 'A standard, solid conversational move that keeps dialogue going naturally without taking big risks or showing exceptional wit.',
+  excellent: 'A sharp, charming, or clever response; great comedic timing, smooth teasing, or an effective conversational save.',
+  brilliant: 'An extraordinary conversational move; a savage comeback, springing a deliberate trap, delivering a devastating punchline, or a high-risk gambit that paid off completely.',
+  inaccuracy: 'A weak, dry, lukewarm, or awkward message; fumbling conversational momentum or missing an obvious joke, but not conversation-ending.',
+  blunder: 'Conversational suicide; walking straight into a trap, an embarrassing self-own, desperate cringe, or killing the vibe completely.',
 }
 
 export type { MessageMemory, MessageMemory as CachedMessage } from '../chat-history'

@@ -126,7 +126,8 @@ export function formatConversation(
 
   authorNames.sort((a, b) => b.name.length - a.name.length)
 
-  const formattedLines: string[] = []
+  const historyLines: string[] = []
+  let targetLine = ''
 
   for (const msg of messages) {
     const authorLetter = authorIdToLetter.get(msg.authorId) ?? 'Unknown'
@@ -151,10 +152,17 @@ export function formatConversation(
       content = `*${msg.contentDescription || 'empty message'}*`
     }
 
-    const rating = ratingCache.get(msg.id)
-    const prefix = msg.id === targetMessageId ? '(RATE THIS) ' : (rating ? `(${rating}) ` : '(unrated) ')
-    formattedLines.push(`${prefix}${authorLetter}: ${content.trim()}`)
+    if (msg.id === targetMessageId) {
+      targetLine = `${authorLetter}: ${content.trim()}`
+    } else {
+      historyLines.push(`${authorLetter}: ${content.trim()}`)
+    }
   }
 
-  return formattedLines.join('\n')
+  const sections: string[] = []
+  if (historyLines.length > 0)
+    sections.push(`[CONVERSATION HISTORY]\n${historyLines.join('\n')}`)
+
+  sections.push(`[TARGET MOVE]\n${targetLine}`)
+  return sections.join('\n\n')
 }

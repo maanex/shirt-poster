@@ -51,7 +51,7 @@ export function isChannelOptedIn(guildId: string | null | undefined, channelId: 
  */
 export function meetsConfidenceGap(
   probabilities: Record<string, number>,
-  minGap = 0.1
+  minGap = 0
 ): { ok: boolean; highest: number; secondHighest: number; diff: number } {
   const [highest = 0, secondHighest = 0] = Object.values(probabilities).sort((a, b) => b - a)
   const diff = highest - secondHighest
@@ -78,20 +78,20 @@ export default defineModule({
       const parsed = parseDiscordMessage(msg)
 
       // 4. Do not rate/react to bot messages or messages without text content
-      if (parsed.isBot || parsed.content.length === 0)
+      if (parsed.isBot || (!parsed.content.length && !parsed.contentDescription?.length))
         return
 
       // 5. Process rating sequentially per channel
       await queueChannelTask(msg.channelId, async () => {
-        const guildId = msg.guildId!
+        const guild = BigInt(msg.guildId!)
 
         // Read N and T from KV with defaults
         const maxMessages = KV.getInt('chess-rating.history-limit', {
-          guild: BigInt(guildId),
+          guild,
           default: 10,
         })
         const cutoffHours = KV.getFloat('chess-rating.history-cutoff-hours', {
-          guild: BigInt(guildId),
+          guild,
           default: 3,
         })
 
@@ -107,7 +107,7 @@ export default defineModule({
         if (!conversationText.trim())
           return
 
-        debugLog(`[ChessRating] Conversation text:\n${conversationText}`)
+        debugLog(`\n\n\n\n\n\n\n[ChessRating] Conversation text:\n${conversationText}`)
 
         // Query decision model
         const decisionClient = getDecisionClient()
@@ -123,10 +123,10 @@ export default defineModule({
 
         debugLog(`[ChessRating] Model response: '${answer.choice}' (confidence: ${answer.confidence})`, answer.probabilities)
 
-        // Check minimum confidence gap from KV (default 0.1)
+        // Check minimum confidence gap from KV (default 0)
         const minGap = KV.getFloat('chess-rating.min-confidence', {
-          guild: BigInt(guildId),
-          default: 0.1,
+          guild,
+          default: 0,
         })
 
         const gap = meetsConfidenceGap(answer.probabilities, minGap)

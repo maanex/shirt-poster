@@ -159,6 +159,7 @@ export async function getOlderChannelMessages(
 ): Promise<MessageMemory[]> {
   const guildId = 'guildId' in channel && channel.guildId ? channel.guildId : ''
   let eligible = (guildId ? memory.get(guildId) || [] : []).filter((m) => m.channelId === channel.id)
+  console.log(eligible)
 
   if (beforeId) {
     const pivot = eligible.find((m) => m.id === beforeId)
@@ -197,8 +198,8 @@ export default defineModule({
         return
       if (!msg.guildId)
         return
-      if (!msg.channel.permissionsFor(msg.guild!.roles.everyone)?.has('ViewChannel'))
-        return
+      // if (!msg.channel.permissionsFor(msg.guild!.roles.everyone)?.has('ViewChannel'))
+      //   return
 
       recordInMemory(msg.guildId, parseDiscordMessage(msg))
     },
